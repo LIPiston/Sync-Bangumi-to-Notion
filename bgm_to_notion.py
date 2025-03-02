@@ -473,7 +473,27 @@ def main():
     # 更新数据库属性
     if not update_notion_database(NOTION_DATABASE_ID):
         print("错误：更新数据库属性失败，请检查数据库ID是否正确")
-        return
+        print("数据库ID可能已失效，将清除所有缓存并重新创建数据库...")
+        # 删除所有缓存文件
+        if os.path.exists(cache_manager.db_cache_file):
+            os.remove(cache_manager.db_cache_file)
+            print("已清除数据库ID缓存")
+        if os.path.exists(cache_manager.cache_file):
+            os.remove(cache_manager.cache_file)
+            print("已清除收藏数据缓存")
+        
+        # 重新创建数据库
+        NOTION_DATABASE_ID = create_notion_database()
+        if not NOTION_DATABASE_ID:
+            print("错误：创建数据库失败")
+            return
+        # 保存新创建的数据库ID到缓存
+        cache_manager.save_database_id(NOTION_DATABASE_ID)
+        
+        # 再次尝试更新数据库属性
+        if not update_notion_database(NOTION_DATABASE_ID):
+            print("错误：更新新创建的数据库属性失败")
+            return
     
     print(f"使用 Notion 数据库: {NOTION_DATABASE_ID}")
     

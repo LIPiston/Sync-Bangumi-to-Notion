@@ -458,11 +458,17 @@ def main():
     # 检查或创建数据库
     global NOTION_DATABASE_ID
     if not NOTION_DATABASE_ID:
+        # 尝试从缓存加载数据库ID
+        NOTION_DATABASE_ID = cache_manager.load_database_id()
+        
+    if not NOTION_DATABASE_ID:
         print("未找到 Notion 数据库 ID，将创建新的数据库...")
         NOTION_DATABASE_ID = create_notion_database()
         if not NOTION_DATABASE_ID:
             print("错误：创建数据库失败")
             return
+        # 保存新创建的数据库ID到缓存
+        cache_manager.save_database_id(NOTION_DATABASE_ID)
     
     # 更新数据库属性
     if not update_notion_database(NOTION_DATABASE_ID):

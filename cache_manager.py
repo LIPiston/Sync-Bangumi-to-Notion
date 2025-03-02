@@ -1,12 +1,13 @@
 import os
 import json
-from typing import Dict, Set, Any
+from typing import Dict, Set, Any, Optional
 
 class CacheManager:
     def __init__(self, cache_dir: str = ".cache"):
         """初始化缓存管理器"""
         self.cache_dir = cache_dir
         self.cache_file = os.path.join(cache_dir, "bgm_cache.json")
+        self.db_cache_file = os.path.join(cache_dir, "notion_db_cache.json")
         self._ensure_cache_dir()
     
     def _ensure_cache_dir(self):
@@ -61,3 +62,30 @@ class CacheManager:
                     updated.append(new_item)
         
         return added, updated, [int(id) for id in deleted]
+        
+    def save_database_id(self, database_id: str) -> bool:
+        """保存Notion数据库ID到缓存文件"""
+        try:
+            data = {"database_id": database_id}
+            with open(self.db_cache_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print(f"数据库ID已保存到缓存: {database_id}")
+            return True
+        except Exception as e:
+            print(f"保存数据库ID到缓存失败: {str(e)}")
+            return False
+    
+    def load_database_id(self) -> Optional[str]:
+        """从缓存文件加载Notion数据库ID"""
+        try:
+            if os.path.exists(self.db_cache_file):
+                with open(self.db_cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    database_id = data.get("database_id")
+                    if database_id:
+                        print(f"从缓存加载数据库ID: {database_id}")
+                        return database_id
+            return None
+        except Exception as e:
+            print(f"从缓存加载数据库ID失败: {str(e)}")
+            return None

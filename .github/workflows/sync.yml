@@ -31,20 +31,10 @@ jobs:
     - name: 恢复缓存
       uses: actions/cache@v3
       with:
-        path: .cache/bgm_cache.json
+        path: .cache
         key: bgm-cache-${{ github.run_number }}
         restore-keys: |
           bgm-cache-
-          
-    - name: 读取存储的数据库 ID
-      id: read_db_id
-      run: |
-        if [ -f ".notion_db_id" ]; then
-          echo "NOTION_DATABASE_ID=$(cat .notion_db_id)" >> $GITHUB_ENV
-          echo "数据库 ID 已从文件中读取"
-        else
-          echo "未找到存储的数据库 ID 文件"
-        fi
         
     - name: 运行同步脚本
       id: sync
@@ -52,25 +42,7 @@ jobs:
         BGM_TOKEN: ${{ secrets.BGM_TOKEN }}
         NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
-        NOTION_DATABASE_ID: ${{ env.NOTION_DATABASE_ID || secrets.NOTION_DATABASE_ID }}
+        NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
       run: |
-        # 运行同步脚本并捕获输出
-        OUTPUT=$(python bgm_to_notion.py)
-        echo "$OUTPUT"
-        
-        # 如果是首次运行，提取数据库 ID 并保存到文件
-        if [[ $OUTPUT =~ "已创建新的 Notion 数据库: ([a-zA-Z0-9-]+)" ]]; then
-          DATABASE_ID=${BASH_REMATCH[1]}
-          echo "找到新创建的数据库 ID: $DATABASE_ID"
-          echo "$DATABASE_ID" > .notion_db_id
-          echo "数据库 ID 已保存到文件"
-        fi
-        
-    - name: 提交数据库 ID 文件
-      if: success() && hashFiles('.notion_db_id') != ''
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add .notion_db_id
-        git commit -m "保存 Notion 数据库 ID" || echo "没有变更需要提交"
-        git push origin HEAD:${GITHUB_REF}
+        # 运行同步脚本
+        python bgm_to_notion.py

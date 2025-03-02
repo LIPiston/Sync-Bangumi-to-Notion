@@ -73,7 +73,7 @@ def create_notion_database():
         # 检查是否有指定的父页面ID
         if NOTION_PAGE_ID:
             parent_page_id = NOTION_PAGE_ID
-            print(f"使用指定的父页面: {parent_page_id}")
+            print(f"使用指定的父页面: ***")
         else:
             # 如果没有指定父页面ID，则搜索现有页面
             search_results = notion.search(query="", filter={"property": "object", "value": "page"}, page_size=1)
@@ -84,7 +84,7 @@ def create_notion_database():
             
             # 使用找到的第一个页面作为父页面
             parent_page_id = search_results["results"][0]["id"]
-            print(f"使用搜索到的父页面: {parent_page_id}")
+            print(f"使用搜索到的父页面: ***")
         
         # 在该页面下创建数据库
         database = notion.databases.create(
@@ -138,7 +138,7 @@ def create_notion_database():
         )
         
         database_id = database["id"]
-        print(f"已创建新的 Notion 数据库: {database_id}")
+        print(f"已创建新的 Notion 数据库: ***")
         
         return database_id
     except Exception as e:
@@ -161,9 +161,12 @@ def get_subject_image(subject_id):
         print(f"获取条目封面失败: {response.status_code}")
         return None
 
-def add_to_notion_database(database_id, collection):
+def add_to_notion_database(database_id, collection, current_index=0, total_count=0):
     """将收藏添加或更新到 Notion 数据库"""
     subject = collection["subject"]
+    
+    # 计算进度百分比
+    progress = (current_index + 1) / total_count * 100 if total_count > 0 else 0
     
     # 查询是否已存在该条目
     query_params = {
@@ -317,14 +320,14 @@ def add_to_notion_database(database_id, collection):
             # 更新现有条目
             page_id = existing_pages[0]["id"]
             notion.pages.update(page_id=page_id, **page_properties)
-            print(f"已更新: {subject['name']}")
+            print(f"已更新: [进度: {progress:.1f}%]")
         else:
             # 创建新条目
             page_properties["parent"] = {"database_id": database_id}
             notion.pages.create(**page_properties)
-            print(f"已添加: {subject['name']}")
+            print(f"已添加: [进度: {progress:.1f}%]")
     except Exception as e:
-        print(f"添加失败: {subject['name']} - {str(e)}")
+        print(f"操作失败: [条目ID: {subject['id']}] - {str(e)}")
 
 def mark_deleted_items(database_id, bgm_subject_ids):
     """将在 Notion 中存在但在 Bangumi 中不存在的条目标记为删除"""
@@ -354,7 +357,7 @@ def mark_deleted_items(database_id, bgm_subject_ids):
             # 获取当前收藏状态
             current_status = page["properties"]["收藏状态"]["select"]["name"] if page["properties"]["收藏状态"]["select"] else ""
             
-            # 如果条目不在 Bangumi 收藏中且状态不是"删除"，则标记为删除
+            # 如果条目不在 Bangumi 收藏中且状态不是"删除
             if subject_id not in bgm_subject_ids and current_status != "删除":
                 notion.pages.update(
                     page_id=page["id"],
@@ -440,7 +443,8 @@ def update_notion_database(database_id):
         print(f"已更新数据库属性")
         return True
     except Exception as e:
-        print(f"更新数据库属性失败: {str(e)}")
+        # print(f"更新数据库属性失败: {str(e)}")
+        print(f"更新数据库属性失败")
         return False
 
 def main():
@@ -453,7 +457,7 @@ def main():
         return
     
     username = user_info["username"]
-    print(f"已获取用户信息: {username}")
+    print(f"已获取 Bangumi 用户信息")
     
     # 检查或创建数据库
     global NOTION_DATABASE_ID
@@ -495,7 +499,7 @@ def main():
             print("错误：更新新创建的数据库属性失败")
             return
     
-    print(f"使用 Notion 数据库: {NOTION_DATABASE_ID}")
+    # print(f"使用 Notion 数据库: {NOTION_DATABASE_ID}")
     
     # 加载本地缓存数据
     print("加载本地缓存数据...")
@@ -544,12 +548,17 @@ def main():
         bgm_subject_ids.add(collection["subject"]["id"])
     
     # 处理新增条目
+    total_items = len(added_items) + len(updated_items)
+    current_index = 0
+    
     for collection in added_items:
-        add_to_notion_database(NOTION_DATABASE_ID, collection)
+        add_to_notion_database(NOTION_DATABASE_ID, collection, current_index, total_items)
+        current_index += 1
     
     # 处理更新条目
     for collection in updated_items:
-        add_to_notion_database(NOTION_DATABASE_ID, collection)
+        add_to_notion_database(NOTION_DATABASE_ID, collection, current_index, total_items)
+        current_index += 1
     
     # 处理删除条目
     if deleted_ids:

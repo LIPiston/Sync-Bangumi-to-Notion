@@ -69,7 +69,7 @@ class CacheManager:
             data = {"database_id": database_id}
             with open(self.db_cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            print(f"数据库ID已保存到缓存: {database_id}")
+            print(f"数据库ID已保存到缓存: ***")
             return True
         except Exception as e:
             print(f"保存数据库ID到缓存失败: {str(e)}")
@@ -83,7 +83,7 @@ class CacheManager:
                     data = json.load(f)
                     database_id = data.get("database_id")
                     if database_id:
-                        print(f"从缓存加载数据库ID: {database_id}")
+                        print(f"从缓存加载数据库 ID")
                         return database_id
             return None
         except Exception as e:

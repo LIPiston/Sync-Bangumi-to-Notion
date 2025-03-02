@@ -1,0 +1,17 @@
+# 缓存文件夹
+.cache/
+
+# Python 虚拟环境
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+path
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+api.yaml

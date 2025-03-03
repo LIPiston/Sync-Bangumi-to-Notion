@@ -1,10 +1,19 @@
 import os
 import requests
-import json
+import logging
 from dotenv import load_dotenv
 from notion_client import Client
 from cache_manager import CacheManager
 from env_manager import update_env_file
+
+# 配置日志记录
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logger = logging.getLogger(__name__)
 
 # 加载环境变量
 load_dotenv()
@@ -36,7 +45,7 @@ def get_user_collections(username, subject_type=None, collection_type=None, limi
     
     params = {
         "limit": limit,
-        "offset": 0  # Add default offset parameter
+        "offset": 0
     }
     
     if subject_type:
@@ -50,8 +59,8 @@ def get_user_collections(username, subject_type=None, collection_type=None, limi
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"获取收藏失败: {response.status_code}")
-        print(response.text)
+        logger.error(f"获取收藏失败: {response.status_code}")
+        logger.error(response.text)
         return None
 
 def get_subject_detail(subject_id):
@@ -63,8 +72,8 @@ def get_subject_detail(subject_id):
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"获取条目详情失败: {response.status_code}")
-        print(response.text)
+        logger.error(f"获取条目详情失败: {response.status_code}")
+        logger.error(response.text)
         return None
 
 def create_notion_database():
@@ -73,18 +82,18 @@ def create_notion_database():
         # 检查是否有指定的父页面ID
         if NOTION_PAGE_ID:
             parent_page_id = NOTION_PAGE_ID
-            print(f"使用指定的父页面: ***")
+            logger.info("使用指定的父页面: ***")
         else:
             # 如果没有指定父页面ID，则搜索现有页面
             search_results = notion.search(query="", filter={"property": "object", "value": "page"}, page_size=1)
             
             if not search_results["results"]:
-                print("未找到可用的页面，无法创建数据库")
+                logger.error("未找到可用的页面，无法创建数据库")
                 return None
             
             # 使用找到的第一个页面作为父页面
             parent_page_id = search_results["results"][0]["id"]
-            print(f"使用搜索到的父页面: ***")
+            logger.info("使用搜索到的父页面: ***")
         
         # 在该页面下创建数据库
         database = notion.databases.create(
@@ -138,11 +147,11 @@ def create_notion_database():
         )
         
         database_id = database["id"]
-        print(f"已创建新的 Notion 数据库: ***")
+        logger.info(f"已创建新的 Notion 数据库: {database_id}")
         
         return database_id
     except Exception as e:
-        print(f"创建数据库失败: {str(e)}")
+        logger.error(f"创建数据库失败: {str(e)}")
         return None
 
 def get_subject_image(subject_id):
@@ -158,7 +167,7 @@ def get_subject_image(subject_id):
     if response.status_code == 302:
         return response.headers.get('Location')
     else:
-        print(f"获取条目封面失败: {response.status_code}")
+        logger.error(f"获取条目封面失败: {response.status_code}")
         return None
 
 def add_to_notion_database(database_id, collection, current_index=0, total_count=0):
@@ -182,16 +191,16 @@ def add_to_notion_database(database_id, collection, current_index=0, total_count
     
     # 处理重复条目，只保留一个（如果有多个相同ID的条目）
     if len(existing_pages) > 1:
-        print(f"发现ID为 {subject['id']} 的重复条目，共 {len(existing_pages)} 条，将只保留最新的一条")
+        logger.warning(f"发现ID为 {subject['id']} 的重复条目，共 {len(existing_pages)} 条，将只保留最新的一条")
         # 按更新时间排序，保留最新的一条
         existing_pages.sort(key=lambda x: x.get("last_edited_time", ""), reverse=True)
         # 删除多余的条目
         for page in existing_pages[1:]:
             try:
                 notion.pages.update(page_id=page["id"], archived=True)
-                print(f"已归档重复条目: ID {subject['id']}")
+                logger.info(f"已归档重复条目: ID {subject['id']}")
             except Exception as e:
-                print(f"归档重复条目失败: ID {subject['id']} - {str(e)}")
+                logger.error(f"归档重复条目失败: ID {subject['id']} - {str(e)}")
         # 只保留最新的一条用于更新
         existing_pages = [existing_pages[0]]
     
@@ -332,14 +341,14 @@ def add_to_notion_database(database_id, collection, current_index=0, total_count
             # 更新现有条目
             page_id = existing_pages[0]["id"]
             notion.pages.update(page_id=page_id, **page_properties)
-            print(f"已更新: [进度: {progress:.1f}%]")
+            logger.info(f"已更新: [进度: {progress:.1f}%]")
         else:
             # 创建新条目
             page_properties["parent"] = {"database_id": database_id}
             notion.pages.create(**page_properties)
-            print(f"已添加: [进度: {progress:.1f}%]")
+            logger.info(f"已添加: [进度: {progress:.1f}%]")
     except Exception as e:
-        print(f"操作失败: [条目ID: {subject['id']}] - {str(e)}")
+        logger.error(f"操作失败: [条目ID: {subject['id']}] - {str(e)}")
 
 def mark_deleted_items(database_id, bgm_subject_ids):
     """将在 Notion 中存在但在 Bangumi 中不存在的条目标记为删除"""
@@ -358,7 +367,7 @@ def mark_deleted_items(database_id, bgm_subject_ids):
         has_more = response.get("has_more", False)
         start_cursor = response.get("next_cursor")
     
-    print(f"Notion 数据库中共有 {len(all_pages)} 条记录")
+    logger.info(f"Notion 数据库中共有 {len(all_pages)} 条记录")
     
     # 找出在 Notion 中存在但在 Bangumi 中不存在的条目
     deleted_count = 0
@@ -369,7 +378,7 @@ def mark_deleted_items(database_id, bgm_subject_ids):
             # 获取当前收藏状态
             current_status = page["properties"]["收藏状态"]["select"]["name"] if page["properties"]["收藏状态"]["select"] else ""
             
-            # 如果条目不在 Bangumi 收藏中且状态不是"删除
+            # 如果条目不在 Bangumi 收藏中且状态不是"删除"
             if subject_id not in bgm_subject_ids and current_status != "删除":
                 notion.pages.update(
                     page_id=page["id"],
@@ -382,11 +391,11 @@ def mark_deleted_items(database_id, bgm_subject_ids):
                     }
                 )
                 deleted_count += 1
-                print(f"已标记为删除: ID {subject_id}")
+                logger.info(f"已标记为删除: ID {subject_id}")
         except Exception as e:
-            print(f"处理条目时出错: {str(e)}")
+            logger.error(f"处理条目时出错: {str(e)}")
     
-    print(f"共标记 {deleted_count} 条记录为删除状态")
+    logger.info(f"共标记 {deleted_count} 条记录为删除状态")
 
 def get_user_info():
     """从 Bangumi API 获取当前用户信息"""
@@ -396,8 +405,8 @@ def get_user_info():
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"获取用户信息失败: {response.status_code}")
-        print(response.text)
+        logger.error(f"获取用户信息失败: {response.status_code}")
+        logger.error(response.text)
         return None
 
 def update_notion_database(database_id):
@@ -458,24 +467,23 @@ def update_notion_database(database_id):
             database_id=database_id,
             properties=properties
         )
-        print(f"已更新数据库属性")
+        logger.info("已更新数据库属性")
         return True
     except Exception as e:
-        # print(f"更新数据库属性失败: {str(e)}")
-        print(f"更新数据库属性失败")
+        logger.error("更新数据库属性失败")
         return False
 
 def main():
-    print("开始同步 Bangumi 收藏到 Notion...")
+    logger.info("开始同步 Bangumi 收藏到 Notion...")
     
     # 获取用户信息
     user_info = get_user_info()
     if not user_info:
-        print("获取用户信息失败，请检查 BGM_TOKEN 是否正确")
+        logger.error("获取用户信息失败，请检查 BGM_TOKEN 是否正确")
         return
     
     username = user_info["username"]
-    print(f"已获取 Bangumi 用户信息")
+    logger.info("已获取 Bangumi 用户信息")
     
     # 检查或创建数据库
     global NOTION_DATABASE_ID
@@ -484,55 +492,55 @@ def main():
         NOTION_DATABASE_ID = cache_manager.load_database_id()
         
     if not NOTION_DATABASE_ID:
-        print("未找到 Notion 数据库 ID，将创建新的数据库...")
+        logger.info("未找到 Notion 数据库 ID，将创建新的数据库...")
         NOTION_DATABASE_ID = create_notion_database()
         if not NOTION_DATABASE_ID:
-            print("错误：创建数据库失败")
+            logger.error("错误：创建数据库失败")
             return
         # 保存新创建的数据库ID到缓存
         cache_manager.save_database_id(NOTION_DATABASE_ID)
     
     # 更新数据库属性
     if not update_notion_database(NOTION_DATABASE_ID):
-        print("错误：更新数据库属性失败，请检查数据库ID是否正确")
-        print("数据库ID可能已失效，将清除所有缓存并重新创建数据库...")
+        logger.error("错误：更新数据库属性失败，请检查数据库ID是否正确")
+        logger.error("数据库ID可能已失效，将清除所有缓存并重新创建数据库...")
         # 删除所有缓存文件
         if os.path.exists(cache_manager.db_cache_file):
             os.remove(cache_manager.db_cache_file)
-            print("已清除数据库ID缓存")
+            logger.info("已清除数据库ID缓存")
         if os.path.exists(cache_manager.cache_file):
             os.remove(cache_manager.cache_file)
-            print("已清除收藏数据缓存")
+            logger.info("已清除收藏数据缓存")
         
         # 重新创建数据库
         NOTION_DATABASE_ID = create_notion_database()
         if not NOTION_DATABASE_ID:
-            print("错误：创建数据库失败")
+            logger.error("错误：创建数据库失败")
             return
         # 保存新创建的数据库ID到缓存
         cache_manager.save_database_id(NOTION_DATABASE_ID)
         
         # 再次尝试更新数据库属性
         if not update_notion_database(NOTION_DATABASE_ID):
-            print("错误：更新新创建的数据库属性失败")
+            logger.error("错误：更新新创建的数据库属性失败")
             return
     
     # print(f"使用 Notion 数据库: {NOTION_DATABASE_ID}")
     
     # 加载本地缓存数据
-    print("加载本地缓存数据...")
+    logger.info("加载本地缓存数据...")
     cached_collections = cache_manager.load_cache()
     
     # 获取用户收藏
-    print("获取 Bangumi 收藏数据...")
+    logger.info("获取 Bangumi 收藏数据...")
     collections = get_user_collections(username)
     
     if not collections:
-        print("未获取到收藏数据")
+        logger.info("未获取到收藏数据")
         return
     
     total = collections["total"]
-    print(f"共有 {total} 条收藏")
+    logger.info(f"共有 {total} 条收藏")
     
     # 如果收藏数量超过一页，继续获取后续页面
     current_offset = 50
@@ -551,14 +559,14 @@ def main():
         current_offset += 50
     
     # 保存最新数据到缓存
-    print("保存最新数据到本地缓存...")
+    logger.info("保存最新数据到本地缓存...")
     cache_manager.save_cache(collections)
     
     # 比较新旧数据，找出需要更新的条目
-    print("比较本地缓存与最新数据...")
+    logger.info("比较本地缓存与最新数据...")
     added_items, updated_items, deleted_ids = cache_manager.compare_collections(collections, cached_collections)
     
-    print(f"发现 {len(added_items)} 个新增条目, {len(updated_items)} 个更新条目, {len(deleted_ids)} 个删除条目")
+    logger.warning(f"发现 {len(added_items)} 个新增条目, {len(updated_items)} 个更新条目, {len(deleted_ids)} 个删除条目")
     
     # 记录所有 Bangumi 收藏的条目 ID
     bgm_subject_ids = set()
@@ -583,7 +591,7 @@ def main():
         print("\n开始处理已从 Bangumi 中删除的条目...")
         mark_deleted_items(NOTION_DATABASE_ID, bgm_subject_ids)
     
-    print("同步完成!")
+    logger.info("同步完成!")
 
 if __name__ == "__main__":
     main()

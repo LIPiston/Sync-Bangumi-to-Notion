@@ -1,5 +1,8 @@
 import os
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def update_env_file(key, value):
     """
@@ -10,7 +13,7 @@ def update_env_file(key, value):
     
     # 检查.env文件是否存在
     if not os.path.exists(env_path):
-        print(f"错误：找不到{env_path}文件")
+        logger.error(f"错误：找不到{env_path}文件")
         return False
     
     # 读取当前.env文件内容
@@ -38,5 +41,5 @@ def update_env_file(key, value):
     with open(env_path, 'w', encoding='utf-8') as file:
         file.writelines(lines)
     
-    print(f"已更新.env文件：{key} = '{value}'")
+    logger.info(f"已更新.env文件：{key} = '{value}'")
     return True

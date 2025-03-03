@@ -301,6 +301,18 @@ def add_to_notion_database(database_id, collection, current_index=0, total_count
                 "multi_select": tags
             }
     
+    # 添加剧集数（如果有）
+    if subject_detail and "eps" in subject_detail:
+        properties["剧集数"] = {
+            "number": subject_detail["eps"]
+        }
+    
+    # 添加观看进度
+    if "ep_status" in collection:
+        properties["观看进度"] = {
+            "number": collection["ep_status"]
+        }
+    
     # 更新或创建条目
     try:
         page_properties = {
@@ -433,6 +445,12 @@ def update_notion_database(database_id):
             },
             "标签": {
                 "multi_select": {}
+            },
+            "剧集数": {
+                "number": {}
+            },
+            "观看进度": {
+                "number": {}
             }
         }
         

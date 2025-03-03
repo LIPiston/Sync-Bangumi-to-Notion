@@ -15,3 +15,5 @@ path
 Thumbs.db
 
 api.yaml
+
+.env_test

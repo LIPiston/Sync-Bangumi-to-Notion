@@ -35,7 +35,7 @@ BGM_API_BASE = "https://api.bgm.tv"
 
 # 请求头
 headers = {
-    "User-Agent": "BGMToNotion/0.1",
+    "User-Agent": "weepwood/Sync-Bangumi-to-Notion",
     "Authorization": f"Bearer {BGM_TOKEN}"
 }
 
@@ -93,7 +93,7 @@ def create_notion_database():
             
             # 使用找到的第一个页面作为父页面
             parent_page_id = search_results["results"][0]["id"]
-            logger.info("使用搜索到的父页面: ***")
+            logger.info(f"使用搜索到的父页面: {parent_page_id}")
         
         # 在该页面下创建数据库
         database = notion.databases.create(
@@ -460,6 +460,11 @@ def update_notion_database(database_id):
             },
             "观看进度": {
                 "number": {}
+            },
+            "进度": {
+                "formula": {
+                    "expression": "round(prop(\"观看进度\") / prop(\"剧集数\") * 100)"
+                }
             }
         }
         
@@ -525,7 +530,7 @@ def main():
             logger.error("错误：更新新创建的数据库属性失败")
             return
     
-    # print(f"使用 Notion 数据库: {NOTION_DATABASE_ID}")
+    logger.info(f"使用 Notion 数据库: {NOTION_DATABASE_ID}")
     
     # 加载本地缓存数据
     logger.info("加载本地缓存数据...")
